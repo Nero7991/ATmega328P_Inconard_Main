@@ -19,14 +19,15 @@ void pullSlaveSelectLow(uint8_t SwitchID);
 void pullSlaveSelectHigh(uint8_t SwitchID);
 void portStateChange(uint8_t PortNo);
 volatile uint8_t SPIdata;
-volatile bool newSPIData;
-uint8_t Socket, State;
+volatile bool newSPIData, Timer1_Flag;
+uint8_t Socket, State, Payload, StateAll;
 int main(void)
 {
     runSetup();
 	_delay_ms(500);
 	Notify(PSTR("Powering on..."));
 	NRF24L01 Radio(1,1,1);
+	Radio.powerON(true);
 	initSPISlave();
 	enableSPIInterrupt(true);
 	sei();
@@ -36,7 +37,7 @@ int main(void)
 	S.callOnPinStateChange(portStateChange);
 	Timer1.begin();
 	Timer1.initializeTimer();
-	Timer1.setCallBackTime(1000, 0, printSomething);
+	Timer1.setCallBackTime(100, 0, printSomething);
 	Notify(PSTR("Done"));
     while (1) 
     {
@@ -51,17 +52,30 @@ int main(void)
 				printHexNumber(SPIdata, 1);
 			}
 			else{
-				//SPI_MasterInit();
-				//printHexNumber(Radio.readSPIRegister(0x17,1),1);
+				enableSPIInterrupt(false);
+				enableSPI(false);
+				SPI_MasterInit();
+				if(!Radio.isRXEmpty()){
+					Radio.readFIFO(&Payload);
+					printStringCRNL("Data received: ");
+					printHexNumber(Payload, 1);
+				}
+				//printStringCRNL("Tick");
+				enableSPI(false);
 				initSPISlave();
+				enableSPIInterrupt(true);
 			}
+			SPDR = PIND >> 2;
 		}
-		//setPinState(PORT_C, 2, getPinState(PORT_C, 0));
+		if(Timer1_Flag){
+			Timer1_Flag = false;
+			printStringCRNL("Timer done.");
+		}
     }
 }
 
 void printSomething(uint8_t Timer_ID){
-	Notify(PSTR("Timer done"));
+	Timer1_Flag = true;
 }
 
 void portStateChange(uint8_t PortNo){
@@ -69,17 +83,16 @@ void portStateChange(uint8_t PortNo){
 	if(PortNo == PORT_C){
 		setPinState(PORT_C, 2, getPinState(PORT_C, 0));
 	}
-	
 }
 
 void runSetup(){
-	SPI_MasterInit();
+	
 	USART_Init(MYUBRR);
 	Init_CTC_T1(2,2000);
 	setPinDirection(PORT_C, 2, OUTPUT);
 	setPinDirection(PORT_D, 2, OUTPUT);
 	setPinDirection(PORT_D, 3, OUTPUT);
-	setPinDirection(PORT_D, 4, OUTPUT);
+	setPinDirection(PORT_D, 4, INPUT);
 	setPinDirection(PORT_D, 5, OUTPUT);
 	setPinState(PORT_D, 2, LOW);
 	setPinState(PORT_D, 3, LOW);
@@ -87,6 +100,7 @@ void runSetup(){
 	setPinState(PORT_D, 5, LOW);
 	setPinState(PORT_C, 2, LOW);
 	setPinDirection(PORT_C, 0, INPUT);
+	SPI_MasterInit();
 	//enableSPIInterrupt(true);
 	//sei();
 }
