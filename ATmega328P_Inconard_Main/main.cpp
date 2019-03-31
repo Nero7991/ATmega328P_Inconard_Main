@@ -27,7 +27,7 @@ void pullSlaveSelectHigh(uint8_t SwitchID);
 void portStateChange(uint8_t PortNo);
 volatile uint8_t SPIdata, SwitchID;
 volatile bool newSPIData, Timer1_Flag, SwitchFlag = false;
-uint8_t Socket, State, Payload, StateAll;
+uint8_t Socket, State, Payload, StateAll, CurrentState;
 TimerClass Timer1;
 SwitchClass S1, S2, S3, S4;
 int main(void)
@@ -69,8 +69,11 @@ int main(void)
 				enableSPIInterrupt(false);
 				enableSPI(false);
 				SPI_MasterInit();
-				if(!Radio.isRXEmpty()){
+				_delay_us(50);
+				if(Radio.isDataReady()){
 					Radio.readFIFO(&Payload);
+					Radio.clearRX_DR();
+					Radio.flushRX();
 					setSocketState(Payload + 1, !getSocketState(Payload + 1));
 					BEEP = 1;
 					Timer1.setCallBackTime(BEEP_TIME, 0, timerDone);
@@ -82,7 +85,8 @@ int main(void)
 				initSPISlave();
 				enableSPIInterrupt(true);
 			}
-			SPDR = PIND >> 2;
+			CurrentState = (getSocketState(1) << 0) | (getSocketState(2) << 1) | (getSocketState(3) << 2) | (getSocketState(4) << 3);
+			SPDR = CurrentState;
 		}
 		if(SwitchFlag){
 			SwitchFlag = false;
@@ -92,7 +96,7 @@ int main(void)
 		}
 		if(Timer1_Flag){
 			Timer1_Flag = false;
-			printStringCRNL("Timer done.");
+			//printStringCRNL("Timer done.");
 		}
     }
 }
@@ -153,7 +157,7 @@ void portStateChange(uint8_t PortNo){
 void runSetup(){
 	
 	USART_Init(MYUBRR);
-	Init_CTC_T1(2,2000);
+	//Init_CTC_T1(2,2000);
 	setPinDirection(PORT_C, 2, OUTPUT);
 	setPinDirection(PORT_C, 3, OUTPUT);
 	setPinDirection(PORT_D, 2, OUTPUT);
