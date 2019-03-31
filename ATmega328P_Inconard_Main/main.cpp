@@ -12,15 +12,24 @@
 #include "NRF24L01.h"
 #include "Timer.h"
 #include "Switch.h"
-
-void printSomething(uint8_t);
+#define  BEEP_TIME 30
+#define SOCKET1	0x03
+#define SOCKET2 0x02
+#define SOCKET3 0x05
+#define SOCKET4	0x04
+void timerDone(uint8_t Timer_ID);
+void switchPressed(uint8_t Switch_ID);
+void setSocketState(uint8_t SocketNo, bool set);
+bool getSocketState(uint8_t SocketNo);
 void runSetup();
 void pullSlaveSelectLow(uint8_t SwitchID);
 void pullSlaveSelectHigh(uint8_t SwitchID);
 void portStateChange(uint8_t PortNo);
-volatile uint8_t SPIdata;
-volatile bool newSPIData, Timer1_Flag;
+volatile uint8_t SPIdata, SwitchID;
+volatile bool newSPIData, Timer1_Flag, SwitchFlag = false;
 uint8_t Socket, State, Payload, StateAll;
+TimerClass Timer1;
+SwitchClass S1, S2, S3, S4;
 int main(void)
 {
     runSetup();
@@ -31,13 +40,16 @@ int main(void)
 	initSPISlave();
 	enableSPIInterrupt(true);
 	sei();
-	TimerClass Timer1;
-	SwitchClass S;
-	S.begin();
-	S.callOnPinStateChange(portStateChange);
 	Timer1.begin();
 	Timer1.initializeTimer();
-	Timer1.setCallBackTime(100, 0, printSomething);
+	Timer1.setCallBackTime(100, 0, timerDone);
+	S1.begin();
+	S1.initializeSwitch(PORT_D, 6, &S1);
+	S2.initializeSwitch(PORT_D, 7, &S2);
+	S3.initializeSwitch(PORT_B, 0, &S3);
+	S4.initializeSwitch(PORT_B, 1, &S4);
+	S1.shortPress(switchPressed);
+	S1.enableSamePtrMode(true);
 	Notify(PSTR("Done"));
     while (1) 
     {
@@ -47,7 +59,9 @@ int main(void)
 				Socket = SPIdata & 0xF0;
 				Socket = Socket >> 4;
 				State = SPIdata & 0x0F;
-				setPinState(PORT_D, Socket + 1, State);
+				setSocketState(Socket, State);
+				BEEP = 1;
+				Timer1.setCallBackTime(BEEP_TIME, 0, timerDone);
 				printStringCRNL("Command received: ");
 				printHexNumber(SPIdata, 1);
 			}
@@ -57,6 +71,9 @@ int main(void)
 				SPI_MasterInit();
 				if(!Radio.isRXEmpty()){
 					Radio.readFIFO(&Payload);
+					setSocketState(Payload + 1, !getSocketState(Payload + 1));
+					BEEP = 1;
+					Timer1.setCallBackTime(BEEP_TIME, 0, timerDone);
 					printStringCRNL("Data received: ");
 					printHexNumber(Payload, 1);
 				}
@@ -67,6 +84,12 @@ int main(void)
 			}
 			SPDR = PIND >> 2;
 		}
+		if(SwitchFlag){
+			SwitchFlag = false;
+			setSocketState(SwitchID + 1, !getSocketState(SwitchID + 1));
+			BEEP = 1;
+			Timer1.setCallBackTime(BEEP_TIME, 0, timerDone);
+		}
 		if(Timer1_Flag){
 			Timer1_Flag = false;
 			printStringCRNL("Timer done.");
@@ -74,8 +97,50 @@ int main(void)
     }
 }
 
-void printSomething(uint8_t Timer_ID){
+void setSocketState(uint8_t SocketNo, bool set){
+	switch(SocketNo){
+		case 1:
+		setPinState(PORT_D, SOCKET1, set);
+		break;
+		case 2:
+		setPinState(PORT_D, SOCKET2, set);
+		break;
+		case 3:
+		setPinState(PORT_D, SOCKET3, set);
+		break;
+		case 4:
+		setPinState(PORT_D, SOCKET4, set);
+		break;
+	}
+}
+
+bool getSocketState(uint8_t SocketNo){
+	switch(SocketNo){
+		case 1:
+		return getPinState(PORT_D, SOCKET1);
+		break;
+		case 2:
+		return getPinState(PORT_D, SOCKET2);
+		break;
+		case 3:
+		return getPinState(PORT_D, SOCKET3);
+		break;
+		case 4:
+		return getPinState(PORT_D, SOCKET4);
+		break;
+	}
+	return 0;
+}
+
+void switchPressed(uint8_t Switch_ID){
+	SwitchFlag = true;
+	SwitchID = Switch_ID;
+}
+
+void timerDone(uint8_t Timer_ID){
 	Timer1_Flag = true;
+	if(BEEP)
+	BEEP = 0;
 }
 
 void portStateChange(uint8_t PortNo){
@@ -90,9 +155,10 @@ void runSetup(){
 	USART_Init(MYUBRR);
 	Init_CTC_T1(2,2000);
 	setPinDirection(PORT_C, 2, OUTPUT);
+	setPinDirection(PORT_C, 3, OUTPUT);
 	setPinDirection(PORT_D, 2, OUTPUT);
 	setPinDirection(PORT_D, 3, OUTPUT);
-	setPinDirection(PORT_D, 4, INPUT);
+	setPinDirection(PORT_D, 4, OUTPUT);
 	setPinDirection(PORT_D, 5, OUTPUT);
 	setPinState(PORT_D, 2, LOW);
 	setPinState(PORT_D, 3, LOW);

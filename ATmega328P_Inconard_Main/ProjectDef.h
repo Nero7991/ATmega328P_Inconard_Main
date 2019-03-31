@@ -23,6 +23,7 @@
 #define CSN_D			GET_BITFIELD(DDRC).bit0
 #define CE				GET_BITFIELD(PORTC).bit1
 #define CE_D			GET_BITFIELD(DDRC).bit1
+#define BEEP			GET_BITFIELD(PORTC).bit3
 
 #define DEBUG_PIN		GET_BITFIELD(DDRB).bit6
 #define DEBUG_PIN_D		GET_BITFIELD(DDRB).bit6
@@ -44,7 +45,7 @@ typedef struct bitstruct
 
 //USART Baud rate
 #define F_CPU 16000000UL
-#define BAUD 1000000
+#define BAUD 500000
 #define MYUBRR F_CPU/16/BAUD-1
 
 
