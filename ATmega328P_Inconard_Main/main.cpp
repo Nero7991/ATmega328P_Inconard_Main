@@ -19,6 +19,7 @@
 #define SOCKET4	0x04
 void timerDone(uint8_t Timer_ID);
 void switchPressed(uint8_t Switch_ID);
+void setAllSocketState(bool set);
 void setSocketState(uint8_t SocketNo, bool set);
 bool getSocketState(uint8_t SocketNo);
 void runSetup();
@@ -59,7 +60,13 @@ int main(void)
 				Socket = SPIdata & 0xF0;
 				Socket = Socket >> 4;
 				State = SPIdata & 0x0F;
+				if((SPIdata & 0xD0) == 0xD0){
+					printStringCRNL("Changing all");
+					setAllSocketState(State);
+				}
+				else{
 				setSocketState(Socket, State);
+				}
 				BEEP = 1;
 				Timer1.setCallBackTime(BEEP_TIME, 0, timerDone);
 				printStringCRNL("Command received: ");
@@ -74,7 +81,20 @@ int main(void)
 					Radio.readFIFO(&Payload);
 					Radio.clearRX_DR();
 					Radio.flushRX();
-					setSocketState(Payload + 1, !getSocketState(Payload + 1));
+					if(Payload & 0xF0){
+						Socket = Payload & 0xF0;
+						Socket = Socket >> 4;
+						State = Payload & 0x0F;
+						if((Payload & 0xD0) == 0xD0){
+							setAllSocketState(State);
+						}
+						else{
+							setSocketState(Socket, State);
+						}
+					}
+					else{
+						setSocketState(Payload, !getSocketState(Payload));
+					}
 					BEEP = 1;
 					Timer1.setCallBackTime(BEEP_TIME, 0, timerDone);
 					printStringCRNL("Data received: ");
@@ -99,6 +119,13 @@ int main(void)
 			//printStringCRNL("Timer done.");
 		}
     }
+}
+
+void setAllSocketState(bool set){
+	setPinState(PORT_D, SOCKET1, set);
+	setPinState(PORT_D, SOCKET2, set);
+	setPinState(PORT_D, SOCKET3, set);
+	setPinState(PORT_D, SOCKET4, set);
 }
 
 void setSocketState(uint8_t SocketNo, bool set){
