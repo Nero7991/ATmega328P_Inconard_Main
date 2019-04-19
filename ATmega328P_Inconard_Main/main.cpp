@@ -12,7 +12,7 @@
 #include "NRF24L01.h"
 #include "Timer.h"
 #include "Switch.h"
-#define  BEEP_TIME 30
+#define BEEP_TIME 30
 #define SOCKET1	0x03
 #define SOCKET2 0x02
 #define SOCKET3 0x05
@@ -37,6 +37,18 @@ int main(void)
 	_delay_ms(500);
 	Notify(PSTR("Powering on..."));
 	NRF24L01 Radio(1,1,1);
+	Radio.enableReceiveAddress(2, true);
+	Radio.enableReceiveAddress(3, true);
+	Radio.enableReceiveAddress(4, true);
+	Radio.enableReceiveAddress(5, true);
+	Radio.enableDPLForRXPipe(0, true);
+	Radio.enableDPLForRXPipe(1, true);
+	Radio.enableDPLForRXPipe(2, true);
+	Radio.enableDPLForRXPipe(3, true);
+	Radio.enableDPLForRXPipe(4, true);
+	Radio.enableDPLForRXPipe(5, true);
+	Radio.setReceiveAddress(0xEABABABAC1, 0);
+	Radio.setReceiveAddress(0xEABABABAC2, 1);
 	Radio.powerON(true);
 	initSPISlave();
 	enableSPIInterrupt(true);
